@@ -1,0 +1,72 @@
+
+```{r}
+suppressMessages(library(tidyverse))
+```
+
+1. Add tissue and sample info 
+
+```{r}
+df <- read.csv('/mnt/tank/scratch/dlupova/tissues.csv')
+```
+
+```{r}
+files <- list.files(path="/mnt/tank/scratch/dlupova/markers_hs", pattern="SRS.+csv", full.names=F, recursive=F)
+processed <- list.files(path="/mnt/tank/scratch/dlupova/markers_hs/with_tissue_srs", pattern="SRS.+csv", full.names=F, recursive=F)
+
+for (srs in files) {
+  if (srs %in% processed == F) {
+    srs <- str_remove(srs, '.csv')
+    markers <- read.csv(sprintf('/mnt/tank/scratch/dlupova/markers_hs/%s.csv', srs))
+    markers <- cbind(markers, rep(df$Tissue[df$path == srs]))
+    markers <- cbind(markers, rep(srs))
+    colnames(markers)[7] <- 'Tissue'
+    colnames(markers)[8] <- 'Sample'
+    write.csv(markers, sprintf('/mnt/tank/scratch/dlupova/markers_hs/with_tissue_srs/%s.csv', srs))
+    rm(list = setdiff(ls(), c('df', 'files', 'processed')))
+  }
+}
+```
+
+2. Filter
+
+```{r}
+files <- list.files('/mnt/tank/scratch/dlupova/markers_mm/with_tissue_srs', full.names=F)
+
+for (f in files) {
+  csv <- read.csv(sprintf('/mnt/tank/scratch/dlupova/markers_mm/with_tissue_srs/%s', f))
+  csv <- csv %>% 
+    filter(p_val_adj < 0.05)
+  write.csv(csv, sprintf('/mnt/tank/scratch/dlupova/markers_mm/filtered/%s', f))
+}
+```
+
+3. Combine all samples
+
+```{r}
+all <- data.frame()
+files <- list.files('/mnt/tank/scratch/dlupova/markers_hs/filtered', full.names=F)
+
+for (f in files) {
+  csv <- read.csv(sprintf('/mnt/tank/scratch/dlupova/markers_hs/filtered/%s', f))
+  all <- rbind(all, csv)
+}
+
+all <- all[, 3:10]
+colnames(all)[1] <- 'Gene'
+write.csv(all, '/mnt/tank/scratch/dlupova/markers_all_samples_hs.csv')
+```
+
+4. Count marker occurrences
+
+```{r}
+markers_mm <- read.csv('/mnt/tank/scratch/dlupova/markers_all_samples_mm.csv', row.names = 1)
+markers_hs <- read.csv('/mnt/tank/scratch/dlupova/markers_all_samples_hs.csv', row.names = 1)
+```
+
+```{r}
+gene_counts_mm <- markers_mm %>% group_by(Gene) %>% tally(sort = T) %>% mutate('%' = n / 49 * 100)
+gene_counts_hs <- markers_hs %>% group_by(Gene) %>% tally(sort = T) %>% mutate('%' = n / 14 * 100)
+
+write.csv(gene_counts_mm, '/mnt/tank/scratch/dlupova/gene_counts_mm.csv')
+write.csv(gene_counts_hs, '/mnt/tank/scratch/dlupova/gene_counts_hs.csv')
+```

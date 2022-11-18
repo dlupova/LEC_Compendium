@@ -1,0 +1,104 @@
+
+```{r}
+library(dplyr)
+library(UniProt.ws)
+library(stringr)
+```
+
+```{r}
+markers <- read.csv('/mnt/tank/scratch/dlupova/counts_mm_cell_loc.csv')
+conv <- read.csv('/mnt/tank/scratch/dlupova/counts_mm_converted_uniprot.tab', sep = '\t')
+
+colnames(conv)[1] <- 'Gene'
+conv <- distinct(conv, Gene, .keep_all = T)
+
+head(conv)
+```
+
+```{r}
+markers <- cbind(markers, rep('-'))
+markers <- cbind(markers, rep('-'))
+markers <- cbind(markers, rep('-'))
+
+colnames(markers)[9] <- 'Gene_name'
+colnames(markers)[10] <- 'UniProtID'
+colnames(markers)[11] <- 'Cellular_location'
+```
+
+```{r}
+up <- UniProt.ws(taxId = 10090) #10090 - Mus muscuclus, 9606 - Homo sapiens
+```
+
+```{r}
+# conv$From <- toupper(conv$From)
+for (gene in conv$Gene) {
+  markers$Gene_name[markers$gene == gene] <- conv$Protein.names[conv$Gene == gene]
+  markers$UniProtID[markers$gene == gene] <- conv$Entry[conv$Gene == gene]
+}  
+
+for (gene in markers$UniProtID) {
+  if (gene != '-') {
+    key <- gene
+    columns <- c("UNIPROTKB","SUBCELLULAR-LOCATIONS")
+  
+    tryCatch({
+    loc <- select(up, key, columns)[,2] #%>% #str_extract_all('(?<=[:;\\.] )[a-zA-Z-\\, ]+(?= \\{)') %>% unlist()
+    }, error = function(e){})
+    if (exists('loc') == T) {
+      markers$Cellular_location[markers$UniProtID == gene] <- loc # paste(loc, collapse = ', ')
+    }
+    rm(list = setdiff(ls(), c('up', 'markers', 'conv')))
+  }
+}  
+
+# write.csv(gene_counts_mm, '/mnt/tank/scratch/dlupova/counts_mm_cell_loc.csv')
+```
+ 
+```{r}
+# gene_counts_mm <- read.csv('/mnt/tank/scratch/dlupova/counts_mm_cell_loc.csv', row.names = 1)
+
+markers$Cellular_location <- str_remove(markers$Cellular_location, '\\{.+\\}')
+markers$Cellular_location <- str_remove(markers$Cellular_location, 'SUBCELLULAR LOCATION: ')
+markers$Cellular_location <- str_remove(markers$Cellular_location, 'Note=')
+markers$Cellular_location <- str_remove(markers$Cellular_location, ' (?=\\.)')
+
+# write.csv(markers, '/mnt/tank/scratch/dlupova/markers_clusters_location_hs.csv')
+```
+
+```{r}
+gene_counts_hs <- read.csv('/mnt/tank/scratch/dlupova/counts_hs_cell_loc.csv', row.names = 1)
+
+gene_counts_hs$Cellular_location <- str_remove(gene_counts_hs$Cellular_location, '\\{.+\\}')
+gene_counts_hs$Cellular_location <- str_remove(gene_counts_hs$Cellular_location, 'SUBCELLULAR LOCATION: ')
+gene_counts_hs$Cellular_location <- str_remove(gene_counts_hs$Cellular_location, 'Note=')
+gene_counts_hs$Cellular_location <- str_remove(gene_counts_hs$Cellular_location, ' (?=\\.)')
+
+# write.csv(gene_counts_hs, '/mnt/tank/scratch/dlupova/counts_hs_cell_loc.csv')
+```
+
+```{r}
+# keys <- 'Q63918'
+# columns <- c("UNIPROTKB","SUBCELLULAR-LOCATIONS") 
+# 
+# res <- select(up, keys, columns)
+# unlist(res[,2])
+# 
+# gene_counts_hs$Cellular_location[gene_counts_hs$UniProtID == keys] <- res[,2] # paste(loc, collapse = ', ')
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

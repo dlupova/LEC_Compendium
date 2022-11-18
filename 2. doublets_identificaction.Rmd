@@ -1,0 +1,116 @@
+
+NOT FILTERED !!! NEED TO SUBSET SINGLETS AND IDENTS LATER !!!
+
+```{r, message = F, warning = F}
+suppressPackageStartupMessages({library(Seurat)
+  library(dplyr)
+  library(harmony)
+  library(ggplot2)
+  library(MAST)
+  library(biomaRt)
+  library(DoubletFinder)
+  library(tidyverse)})
+```
+
+
+Mouse
+
+```{r}
+files_mm <- list.files(path="/mnt/tank/scratch/dlupova/05.2022/to_add_mm", pattern="*.rds", full.names=TRUE, recursive=FALSE)
+processed_mm <- list.files(path="/mnt/tank/scratch/dlupova/05.2022/doublets_mm", pattern="*.rds", full.names=TRUE, recursive=FALSE) %>%
+  str_extract('SRS.*rds')
+not_processed_mm <- c()
+
+doublet_rate <- data.frame(seq(0, 7.6, by=7.6/10000), seq(0, 10000, by=1))
+colnames(doublet_rate) <- c('rate', 'n')
+```
+
+```{r}
+for (obj in files_mm) {
+  if (str_extract(obj, 'SRS.*rds') %in% processed_mm == F) {
+    object <- readRDS(obj) %>%
+      subset(subset = nFeature_RNA > 300 & percent.mito < 0.2) 
+    n <- dim(object)[2]
+
+    if (n < 10000) {
+      sweep.res.list <- paramSweep_v3(object, PCs = 1:10, sct = T)
+      sweep.stats <- summarizeSweep(sweep.res.list, GT = FALSE)
+      bcmvn <- find.pK(sweep.stats)
+      pk <- as.numeric(levels(bcmvn$pK[bcmvn$BCmetric == max(bcmvn$BCmetric)]))[bcmvn$pK[bcmvn$BCmetric == max(bcmvn$BCmetric)]]
+      
+      annotations <- object@meta.data$seurat_clusters
+      homotypic.prop <- modelHomotypic(annotations)           
+      nExp_poi <- round(doublet_rate$rate[doublet_rate$n == n]/100*nrow(object@meta.data))  ## Assuming doublet formation rate based on cell number
+      nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
+      
+      object <- doubletFinder_v3(object, PCs = 1:10, pN = 0.25, pK = pk, nExp = nExp_poi, reuse.pANN = FALSE, sct = T)
+      saveRDS(object, file = sprintf('/mnt/tank/scratch/dlupova/05.2022/doublets_mm/%s.rds', str_extract(obj, '\\w+(?=\\.rds)')))
+    } else {
+      not_processed_mm <- c(not_processed_mm, obj)
+    }
+    gc()
+  }
+}
+```
+
+NOT FILTERED !!! NEED TO SUBSET SINGLETS AND IDENTS LATER !!!
+
+
+Human
+
+```{r}
+files_hs <- list.files(path="/mnt/tank/scratch/dlupova/05.2022/to_add_hs", pattern="*.rds", full.names=TRUE, recursive=FALSE)
+processed_hs <- list.files(path="/mnt/tank/scratch/dlupova/05.2022/doublets_hs", pattern="*.rds", full.names=TRUE, recursive=FALSE) %>%
+  str_extract('SRS.*rds')
+not_processed_hs <- c()
+```
+
+```{r}
+for (obj in files_hs) {
+  if (str_extract(obj, 'SRS.*rds') %in% processed_hs == F) {
+    object <- readRDS(obj) %>%
+      subset(subset = nFeature_RNA > 300 & percent.mito < 0.2) 
+    n <- dim(object)[2]
+
+    if (n < 10000) {
+      sweep.res.list <- paramSweep_v3(object, PCs = 1:10, sct = T)
+      sweep.stats <- summarizeSweep(sweep.res.list, GT = FALSE)
+      bcmvn <- find.pK(sweep.stats)
+      pk <- as.numeric(levels(bcmvn$pK[bcmvn$BCmetric == max(bcmvn$BCmetric)]))[bcmvn$pK[bcmvn$BCmetric == max(bcmvn$BCmetric)]]
+
+      annotations <- object@meta.data$seurat_clusters
+      homotypic.prop <- modelHomotypic(annotations)           
+      nExp_poi <- round(doublet_rate$rate[doublet_rate$n == n]/100*nrow(object@meta.data))  ## Assuming doublet formation rate based on cell number
+      nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
+      
+      object <- doubletFinder_v3(object, PCs = 1:10, pN = 0.25, pK = pk, nExp = nExp_poi, reuse.pANN = FALSE, sct = T)
+      saveRDS(object, file = sprintf('/mnt/tank/scratch/dlupova/05.2022/doublets_hs/%s.rds', str_extract(obj, '\\w+(?=\\.rds)')))
+    } else {
+      not_processed_hs <- c(not_processed_hs, obj)
+    }
+    gc()
+  }
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

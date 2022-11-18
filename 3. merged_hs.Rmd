@@ -1,0 +1,215 @@
+```{r}
+suppressPackageStartupMessages({library(Seurat)
+  library(tidyverse)
+  library(harmony)
+  library(ggplot2)
+  library(MAST)
+  library(biomaRt)})
+```
+
+```{r}
+merged_hs <- merge(# testis
+                SRS3065427, y = c(SRS3065428, SRS3065429, SRS3065430, SRS3065431, SRS3822680, 
+                                  SRS3822682, SRS3822683, SRS3822686, SRS5086064,
+                # pancreas
+                SRS3279684, SRS3279685, SRS3279686, SRS3279687, SRS3279688, SRS3279689, SRS3279690, 
+                SRS3279691, SRS3279692, SRS3279693, SRS3279694,
+                # lung
+                SRS4149983, SRS4149986, SRS4149987, SRS4149990, SRS4149992, SRS4149994, SRS4149997, 
+                SRS4488610, SRS4488612, SRS2769050, SRS2769051, SRS5584813, SRS5584814, SRS5584815,
+                # kidney
+                SRS6796026, SRS6796027, SRS6796028, SRS3112005, SRS3112006, SRS3306242, SRS4139633, 
+                SRS4139634, SRS4139635,
+                # heart
+                SRS7290481, SRS7290482, SRS7290492,
+                # # colon
+                # SRS3296613,
+                # # sinonasal tissue
+                # SRS7204918,
+                # liver
+                SRS7238060, SRS7238062
+                ))
+
+table(merged_hs$orig.ident)
+```
+
+```{r}
+merged_hs@meta.data$tissue <- c(rep("testis", sum(ncol(SRS3065427), ncol(SRS3065428), ncol(SRS3065429), ncol(SRS3065430), 
+                                               ncol(SRS3065431), ncol(SRS3822680),ncol(SRS3822682), ncol(SRS3822683), 
+                                               ncol(SRS3822686), ncol(SRS5086064))),
+                             rep("pancreas", sum(ncol(SRS3279684), ncol(SRS3279685), ncol(SRS3279686), ncol(SRS3279687), 
+                                                 ncol(SRS3279688), ncol(SRS3279689), ncol(SRS3279690), ncol(SRS3279691), 
+                                                 ncol(SRS3279692), ncol(SRS3279693), ncol(SRS3279694))),
+                             rep("lung", sum(ncol(SRS4149983), ncol(SRS4149986), ncol(SRS4149987), ncol(SRS4149990), ncol(SRS4149992),
+                                             ncol(SRS4149994), ncol(SRS4149997), ncol(SRS4488610), ncol(SRS4488612), ncol(SRS2769050),
+                                             ncol(SRS2769051), ncol(SRS5584813), ncol(SRS5584814), ncol(SRS5584815))),
+                             rep("kidney", sum(ncol(SRS6796026), ncol(SRS6796027), ncol(SRS6796028), ncol(SRS3112005), ncol(SRS3112006),
+                                               ncol(SRS3306242), ncol(SRS4139633), ncol(SRS4139634), ncol(SRS4139635))),
+                             rep("heart", sum(ncol(SRS7290481), ncol(SRS7290482), ncol(SRS7290492))),
+                             rep("liver", sum(ncol(SRS7238060), ncol(SRS7238062))))
+
+
+# saveRDS(merged, '/mnt/tank/scratch/dlupova/05.2022/merged_hs_pre.rds')
+```
+
+```{r}
+# merged <- readRDS('/mnt/tank/scratch/dlupova/05.2022/merged_hs_pre.rds')
+# table(hs$orig.ident)  
+```
+
+```{r}
+s.genes <- cc.genes.updated.2019$s.genes
+g2m.genes <- cc.genes.updated.2019$g2m.genes
+```
+
+```{r, message=F, warning=F}
+merged_hs <- merged_hs %>% SCTransform(vars.to.regress = "percent.mito", verbose = FALSE) %>% 
+  CellCycleScoring(s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
+vargenes <- VariableFeatures(merged_hs)
+no_ccg <- setdiff(vargenes, c(g2m.genes, s.genes))
+
+merged_hs <- RunPCA(merged_hs, features = no_ccg)
+DimPlot(merged_hs)
+```
+
+```{r}
+merged_hs <- merged_hs %>% SCTransform(assay = 'SCT', new.assay.name = 'SCT',
+                                 vars.to.regress = c('S.Score', 'G2M.Score'), verbose = FALSE)
+
+merged_hs <- RunPCA(merged_hs, features = no_ccg)
+DimPlot(merged_hs)
+```
+
+```{r, message = F}
+merged_hs <- merged_hs %>% 
+    RunHarmony('orig.ident', assay.use = 'SCT', plot_convergence = T, project.dim = F, max.iter.harmony = 20)
+```
+
+```{r}
+DimPlot(object = merged_hs, reduction = 'harmony', group.by = 'orig.ident')
+DimPlot(object = merged_hs, reduction = 'harmony', group.by = 'tissue')
+```
+
+```{r}
+merged_hs <- merged_hs %>% 
+    RunUMAP(reduction = "harmony", dims = 1:20, verbose = F) %>% 
+    FindNeighbors(reduction = "harmony", dims = 1:20, verbose = F) %>%
+    FindClusters(resolution = 0.6, graph.name = "SCT_snn", verbose = F) 
+```
+
+```{r fig1, fig.height = 7, fig.width = 7}
+DimPlot(merged_hs, reduction = "umap", group.by = "orig.ident")
+DimPlot(merged_hs, reduction = "umap", group.by = "tissue") + theme_classic(base_size=18) #+ NoLegend()
+DimPlot(merged_hs, reduction = "umap", group.by = "Phase")
+DimPlot(merged_hs, reduction = "umap", label = TRUE) + theme_classic(base_size=18) #+ NoLegend() + ggtitle('a')
+```
+
+```{r}
+# saveRDS(merged_hs, file = '/mnt/tank/scratch/dlupova/05.2022/merged_hs_post.rds')
+```
+
+```{r}
+# markers <- FindAllMarkers(merged_hs, test.use = "MAST", only.pos = T)
+# write.csv(markers, file='/mnt/tank/scratch/dlupova/05.2022/markers_hs.csv')
+```
+
+```{r}
+t <- as.data.frame(table(merged_hs$orig.ident))
+colnames(t) <- c('Sample', 'nCells')
+t <- t[order(t$nCells),]
+ggplot(t, aes(x=reorder(Sample, -nCells), y=nCells)) + 
+  geom_col() + 
+  labs(x='Sample', y = 'Number of cells') +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        plot.title = element_text(size = 18), 
+        panel.background = element_rect(fill = 'white'), 
+        panel.grid.major = element_line(colour = "grey95"), 
+        axis.text = element_text(size = 13), 
+        axis.title = element_text(size = 18), 
+        strip.text = element_text(size = 12)) +
+  ylim(0, 2000)
+```
+
+```{r}
+DimPlot(hs, reduction = "umap", label = T, split.by = 'tissue', ncol = 4, pt.size = 3)
+```
+
+```{r}
+# library(SCNPrep)
+# merged <- readRDS('/mnt/tank/scratch/dlupova/05.2022/merged_hs_post.rds')
+# markers <- read.csv('/mnt/tank/scratch/dlupova/05.2022/markers_hs.csv')
+# 
+# tissues <- merged@meta.data[, "tissue", drop=F]
+# tissues$tissue <- as.factor(tissues$tissue)
+# names(tissues)[names(tissues) == 'tissue'] <- 'tissues'
+# 
+# migrateSeuratObject(object = merged,
+#                     assay="SCT",
+#                     species='hs',
+#                     outdir = "LEC_hs_0522",
+#                     public = F,
+#                     markers = markers, 
+#                     generateMarkers = F,
+#                     name = "LEC_hs_0522",
+#                     token = "LEC_hs_0522",
+#                     userAnnotation = list(tissues))
+```
+
+```{r}
+library(lemon)
+
+t <- merged_hs@meta.data %>% group_by(tissue, seurat_clusters) %>%
+  tally() 
+colnames(t) <- c('Tissue','Cluster', 'nCells')
+t <- t %>% group_by(Tissue) %>%
+  mutate(Percentage = nCells / sum(nCells) * 100)
+
+t$Tissue <- toupper(t$Tissue)
+
+t <- t %>% group_by(Tissue) %>% 
+  mutate(Stat = sprintf('%s\ncells: %s, samples: %s', 
+                        Tissue, as.character(sum(nCells)), 
+                        as.character(length(unique(merged_hs@meta.data$orig.ident[merged_hs@meta.data$tissue == tolower(Tissue)])))))
+
+ggplot(t, aes(x = Cluster, y = Percentage)) + 
+    geom_col() + 
+    ylim(0, 100) +
+    labs(x = 'Cluster', y = 'Clusters per tissue, %') +
+    # ggtitle('Cluster distribution across tissues (Mouse)') +
+    facet_rep_wrap(~Stat, nrow = 2, ncol = 3, repeat.tick.labels = 'bottom') +
+    theme(plot.title = element_text(size = 18), 
+          panel.background = element_rect(fill = 'white'), 
+          panel.grid.major = element_line(colour = "grey95"), 
+          axis.text = element_text(size = 11), 
+          axis.title = element_text(size = 14), 
+          strip.text = element_text(size = 12),
+          axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=1))
+```
+
+```{r}
+t <- as.data.frame(table(merged_hs$tissue))
+colnames(t) <- c('Tissue', 'nCells')
+t <- t[order(t$nCells),]
+
+t$Tissue <- t$Tissue %>% str_to_sentence()
+
+ggplot(t, aes(x=reorder(Tissue, -nCells), y=nCells)) + 
+  geom_col() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        panel.background = element_rect(fill = 'white'), 
+        panel.grid.major = element_line(colour = "grey95"), 
+        axis.text = element_text(size = 12), 
+        axis.title = element_text(size = 14)) + 
+  labs(x='Tissue', y = 'Number of cells')
+```
+
+```{r fig1, fig.height = 8, fig.width = 12}
+FeaturePlot(merged_hs, features = c('CD74', 'CLU', 'IFNGR2', 'IL33', 'RELB', 'VCAM1'), ncol = 3) & NoLegend()
+# FeaturePlot(merged_hs, features = c('GJA1', 'KLF4', 'ESAM', 'GATA2', 'CLDN11', 'ANGPT2'), ncol = 3) & NoLegend()
+```
+
+```{r fig1, fig.height = 4, fig.width = 8}
+FeaturePlot(merged_hs, features = c('PROX1', 'TEK')) & NoLegend()
+```
+

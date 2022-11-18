@@ -1,0 +1,266 @@
+
+```{r}
+suppressPackageStartupMessages({library(Seurat)
+  library(tidyverse)
+  library(harmony)
+  library(ggplot2)
+  library(MAST)
+  library(biomaRt)
+  library(babelgene)})
+```
+
+```{r}
+merged <- merge(
+                # intestine
+                SRS4203378, y = c(SRS4203379, SRS5867745, SRS3495284, SRS3495285, SRS8095201, SRS8095202,
+                # kidney
+                SRS2859161, SRS2859163, SRS7586870, SRS7586872,
+                # lung
+                SRS4237518, SRS4237522, SRS4237526, SRS4237527, SRS5753085, SRS5753096, SRS5753102, SRS5753061, 
+                SRS5753081, SRS5753065, SRS5753086, SRS5753106, SRS5753107, SRS5753108, SRS5753109, SRS5753111, 
+                SRS5753113, SRS5753114, SRS7158548, SRS7158549, SRS7158550, SRS2532205, SRS2532206, SRS2532207, 
+                SRS2532208, SRS2532209, SRS2532210,
+                # heart
+                SRS5199380, SRS5199381, SRS5199382, SRS5199386, SRS3601063, SRS3601076, SRS2749416, SRS3279186, 
+                SRS4004490, SRS4004491,
+                # pancreas
+                SRS5848499, SRS5848501, SRS3297653,
+                # liver
+                SRS4491367, SRS4491368, SRS4491369, SRS4491370, SRS7392906, SRS7392907, SRS7392910, SRS7392911, 
+                SRS7238074,
+                # brain
+                SRS5879848, SRS5879849, SRS5879850, SRS5879852, SRS5879853, SRS5879854, SRS7898164, SRS7898165, 
+                SRS5856802, SRS5856803, SRS5961041,
+                # aorta
+                SRS5716561, SRS4824181, SRS4824188, SRS4824189, SRS4824191,
+                # colon
+                SRS3545821, SRS3545823, SRS5867757,
+                # # visceral adipose tissue
+                # SRS5720307,
+                # bladder
+                SRS5757803, SRS5757804, SRS5757805,
+                # skin
+                SRS6714254, SRS6714255, SRS7018358, SRS7040862, SRS7040869, SRS7442443, SRS7442444
+                # # arteries
+                # SRS7124066,
+                # # prostate
+                # SRS6474111,
+                # # middle ear mucosa
+                # SRS6239161,
+                # # digit tip
+                # SRS6011691
+                ))
+```
+
+```{r}
+merged@meta.data$tissue <- c(rep("intestine", sum(ncol(SRS4203378), ncol(SRS4203379), ncol(SRS5867745), ncol(SRS3495284),
+                                                  ncol(SRS3495285), ncol(SRS8095201), ncol(SRS8095202))),
+                             rep("kidney", sum(ncol(SRS2859161), ncol(SRS2859163), ncol(SRS7586870), ncol(SRS7586872))),
+                             rep("lung", sum(ncol(SRS4237518), ncol(SRS4237522), ncol(SRS4237526), ncol(SRS4237527), ncol(SRS5753085),
+                                             ncol(SRS5753096), ncol(SRS5753102), ncol(SRS5753061), ncol(SRS5753081), ncol(SRS5753065),
+                                             ncol(SRS5753086), ncol(SRS5753106), ncol(SRS5753107), ncol(SRS5753108), ncol(SRS5753109),
+                                             ncol(SRS5753111), ncol(SRS5753113), ncol(SRS5753114), ncol(SRS7158548), ncol(SRS7158549),
+                                             ncol(SRS7158550), ncol(SRS2532205), ncol(SRS2532206), ncol(SRS2532207), ncol(SRS2532208),
+                                             ncol(SRS2532209), ncol(SRS2532210))),
+                             rep("heart", sum(ncol(SRS5199380), ncol(SRS5199381), ncol(SRS5199382), ncol(SRS5199386), ncol(SRS3601063),
+                                              ncol(SRS3601076), ncol(SRS2749416), ncol(SRS3279186), ncol(SRS4004490), ncol(SRS4004491))),
+                             rep("pancreas", sum(ncol(SRS5848499), ncol(SRS5848501), ncol(SRS3297653))),
+                             rep("liver", sum(ncol(SRS4491367), ncol(SRS4491368), ncol(SRS4491369), ncol(SRS4491370), ncol(SRS7392906),
+                                              ncol(SRS7392907), ncol(SRS7392910), ncol(SRS7392911), ncol(SRS7238074))),
+                             rep("brain", sum(ncol(SRS5879848), ncol(SRS5879849), ncol(SRS5879850), ncol(SRS5879852), ncol(SRS5879853),
+                                              ncol(SRS5879854), ncol(SRS7898164), ncol(SRS7898165), ncol(SRS5856802), ncol(SRS5856803),
+                                              ncol(SRS5961041))),
+                             rep("aorta", sum(ncol(SRS5716561), ncol(SRS4824181), ncol(SRS4824188), ncol(SRS4824189), ncol(SRS4824191))),
+                             rep("colon", sum(ncol(SRS3545821), ncol(SRS3545823), ncol(SRS5867757))),
+                             rep("bladder", sum(ncol(SRS5757803), ncol(SRS5757804), ncol(SRS5757805))),
+                             rep("skin", sum(ncol(SRS6714254), ncol(SRS6714255), ncol(SRS7018358), ncol(SRS7040862), ncol(SRS7040869),
+                                             ncol(SRS7442443), ncol(SRS7442444))))
+
+
+# saveRDS(merged, '/mnt/tank/scratch/dlupova/05.2022/merged_mm_pre.rds')
+```
+
+```{r}
+# merged <- readRDS('/mnt/tank/scratch/dlupova/05.2022/merged_mm_pre.rds')
+(dim(merged))
+table(merged$orig.ident)  
+```
+
+```{r}
+# convertHumanGeneList <- function(x){
+#   require("biomaRt")
+#   human <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+#   mouse <- useMart("ensembl", dataset = "mmusculus_gene_ensembl")
+#   genesV2 <- getLDS(attributes = c("hgnc_symbol"), filters = "hgnc_symbol", values = x , mart = human, attributesL = c("mgi_symbol"), martL = mouse, uniqueRows=T)
+#   humanx <- unique(genesV2[, 2])
+#   return(humanx)
+# }
+```
+
+```{r, message=F, warning=F}
+# m.s.genes <- convertHumanGeneList(cc.genes.updated.2019$s.genes)
+# m.g2m.genes <- convertHumanGeneList(cc.genes.updated.2019$g2m.genes)
+
+conv_s <- orthologs(genes = cc.genes.updated.2019$s.genes, species = "mouse")
+conv_g2m <- orthologs(genes = cc.genes.updated.2019$g2m.genes, species = "mouse")
+
+m.s.genes <- conv_s$symbol
+m.g2m.genes <- conv_g2m$symbol
+```
+
+```{r, message=F, warning=F}
+merged <- merged %>% SCTransform(vars.to.regress = "percent.mito", verbose = FALSE) %>% 
+  CellCycleScoring(s.features = m.s.genes, g2m.features = m.g2m.genes, set.ident = TRUE)
+
+vargenes <- VariableFeatures(merged)
+no_ccg <- setdiff(vargenes, c(m.g2m.genes, m.s.genes))
+
+merged <- RunPCA(merged, features = no_ccg)
+DimPlot(merged)
+```
+
+```{r}
+merged <- merged %>% SCTransform(assay = 'SCT', new.assay.name = 'SCT',
+                                 vars.to.regress = c('S.Score', 'G2M.Score'), verbose = FALSE)
+
+merged <- RunPCA(merged, features = no_ccg)
+DimPlot(merged)
+```
+
+```{r, message = F}
+merged <- merged %>% 
+    RunHarmony('orig.ident', assay.use = 'SCT', plot_convergence = T, project.dim = F, max.iter.harmony = 20)
+```
+
+```{r}
+DimPlot(object = merged, reduction = 'harmony', group.by = 'orig.ident')
+```
+
+```{r}
+DimPlot(object = merged, reduction = 'harmony', group.by = 'tissue')
+```
+
+```{r}
+merged <- merged %>% 
+    RunUMAP(reduction = "harmony", dims = 1:20, verbose = F) %>% 
+    FindNeighbors(reduction = "harmony", dims = 1:20, verbose = F) %>%
+    FindClusters(resolution = 0.6, graph.name = "SCT_snn", verbose = F) 
+```
+
+```{r fig1, fig.height = 7, fig.width = 7}
+DimPlot(merged, reduction = "umap", group.by = "orig.ident")
+DimPlot(merged, reduction = "umap", group.by = "tissue") + theme_classic(base_size=18)# + NoLegend()
+DimPlot(merged, reduction = "umap", group.by = "Phase")
+DimPlot(merged, reduction = "umap", label = TRUE) + theme_classic(base_size=18) #+ NoLegend() + ggtitle('a')
+```
+
+```{r}
+# saveRDS(merged, file = '/mnt/tank/scratch/dlupova/05.2022/merged_mm_post.rds')
+```
+
+```{r}
+# markers <- FindAllMarkers(merged, test.use = "MAST", only.pos = T)
+# write.csv(markers, file='/mnt/tank/scratch/dlupova/05.2022/markers_mm.csv')
+``` 
+
+```{r}
+t <- as.data.frame(table(merged$orig.ident))
+colnames(t) <- c('Sample', 'nCells')
+t <- t[order(t$nCells),]
+ggplot(t, aes(x=reorder(Sample, -nCells), y=nCells)) + 
+  geom_col() + 
+  labs(x='Sample', y = 'Number of cells') +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        plot.title = element_text(size = 18), 
+        panel.background = element_rect(fill = 'white'), 
+        panel.grid.major = element_line(colour = "grey95"), 
+        axis.text = element_text(size = 13), 
+        axis.title = element_text(size = 18), 
+        strip.text = element_text(size = 12)) +
+  ylim(0, 2000)
+```
+
+```{r}
+DimPlot(merged, reduction = "umap", label = T, split.by = 'tissue', ncol = 4, pt.size = 3)
+```
+
+```{r}
+# merged <- readRDS('/mnt/tank/scratch/dlupova/05.2022/merged_mm_post.rds')
+# markers <- read.csv('/mnt/tank/scratch/dlupova/05.2022/markers_mm.csv')
+# 
+# tissues <- merged@meta.data[, "tissue", drop=F]
+# tissues$tissue <- as.factor(tissues$tissue)
+# names(tissues)[names(tissues) == 'tissue'] <- 'tissues'
+# 
+# migrateSeuratObject(object = merged,
+#                     assay="SCT",
+#                     species='mm',
+#                     outdir = "LEC_mm_0522",
+#                     public = F,
+#                     markers = markers, 
+#                     generateMarkers = F,
+#                     name = "LEC_mm_0522",
+#                     token = "LEC_mm_0522",
+#                     userAnnotation = list(tissues))
+```
+
+```{r}
+library(lemon)
+
+t <- merged@meta.data %>% group_by(tissue, seurat_clusters) %>%
+  tally() 
+colnames(t) <- c('Tissue','Cluster', 'nCells')
+t <- t %>% group_by(Tissue) %>%
+  mutate(Percentage = nCells / sum(nCells) * 100)
+
+t$Tissue <- toupper(t$Tissue)
+
+t <- t %>% group_by(Tissue) %>% 
+  mutate(Stat = sprintf('%s\ncells: %s, samples: %s', 
+                        Tissue, as.character(sum(nCells)), 
+                        as.character(length(unique(merged@meta.data$orig.ident[merged@meta.data$tissue == tolower(Tissue)])))))
+
+ggplot(t, aes(x = Cluster, y = Percentage)) + 
+    geom_col() + 
+    ylim(0, 100) +
+    labs(x = 'Cluster', y = 'Clusters per tissue, %') +
+    # ggtitle('Cluster distribution across tissues (Mouse)') +
+    facet_rep_wrap(~Stat, nrow = 4, ncol = 4, repeat.tick.labels = 'bottom') +
+    theme(plot.title = element_text(size = 18), 
+          panel.background = element_rect(fill = 'white'), 
+          panel.grid.major = element_line(colour = "grey95"), 
+          axis.text = element_text(size = 11), 
+          axis.title = element_text(size = 14), 
+          strip.text = element_text(size = 12),
+          axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=1))
+```
+
+```{r}
+t <- as.data.frame(table(merged$tissue))
+colnames(t) <- c('Tissue', 'nCells')
+t <- t[order(t$nCells),]
+
+t$Tissue <- t$Tissue %>% str_to_sentence()
+
+ggplot(t, aes(x=reorder(Tissue, -nCells), y=nCells)) + 
+  geom_col() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        panel.background = element_rect(fill = 'white'), 
+        panel.grid.major = element_line(colour = "grey95"), 
+        axis.text = element_text(size = 12), 
+        axis.title = element_text(size = 14)) + 
+  labs(x='Tissue', y = 'Number of cells')
+```
+
+```{r fig1, fig.height = 8, fig.width = 12}
+FeaturePlot(merged, features = c('Kdr', 'Flt4', 'Nrp2', 'Mrc1', 'Stab2', 'Mgll'), ncol = 3) & NoLegend()
+# FeaturePlot(merged, features = c('Gja4', 'Cldn11', 'Foxc2', 'Esam', 'Gata2', 'Bmp4'), ncol = 3) & NoLegend()
+```
+
+
+
+
+
+
+
+

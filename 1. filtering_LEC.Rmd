@@ -1,0 +1,111 @@
+```{r}
+suppressPackageStartupMessages({library(Seurat)
+  library(dplyr)
+  library(harmony)
+  library(ggplot2)
+  library(MAST)
+  library(biomaRt)})
+```
+
+```{r}
+# files <- as.list(list.files(path="/mnt/tank/scratch/dlupova/05.2022/doublets_mm/old", pattern="*.rds", recursive=FALSE))
+# n <- 1
+```
+
+```{r}
+# object <- as.character(files[n])
+# print(object)
+```
+
+```{r}
+object <- as.character(files[n])
+# object <- "SRS7442443.rds"
+
+print(object)
+
+obj <- readRDS(file = sprintf('/mnt/tank/scratch/dlupova/05.2022/doublets_mm/old/%s', object))         
+(dim(obj))
+obj <- subset(obj, subset = nFeature_RNA > 300 & percent.mito < 0.2)
+(dim(obj))
+names(obj@meta.data[21]) # 17 or 19 or 21
+```
+
+```{r message=FALSE, warning=FALSE}
+LEC <- obj %>% subset(subset = DF.classifications_0.25_0.02_17 == 'Singlet')
+
+FeaturePlot(LEC, feature = c('Pecam1', 'Cdh5', 'Tie1', 'Prox1', 'Flt4', 'Mmrn1', 'Ccl21a', 'Lyve1', 'Gng11', 'Kdr'))
+# FeaturePlot(LEC, feature = c('PECAM1', 'CDH5', 'TIE1', 'PROX1', 'FLT4', 'MMRN1', 'CCL21', 'LYVE1', 'GNG11', 'KDR'))
+
+FeaturePlot(LEC, feature = c('Tyrobp', 'S100a9', 'Mmp9', 'Ptprc', 'Pdgfra', 'Pdgfrb', 'Acta2', 'Col1a2', 'Krt15', 'Perp'))
+FeaturePlot(LEC, feature = c('Nkg7', 'Cd3e', 'Ms4a1', 'Itgax', 'Ptprc', 'Hba-a1', 'Hba-a2', 'Hbb-bs', 'Sfn', 'Col1a1'))
+# FeaturePlot(LEC, feature = c('TYROBP', 'S100A9', 'MMP9', 'PTPRC', 'PDGFRA', 'PDGFRB', 'ACTA2', 'COL1A2', 'KRT15', 'PERP'))
+# FeaturePlot(LEC, feature = c('NKG7', 'CD3E', 'MS4A1', 'ITGAX', 'HBA1', 'HBA2', 'HBB', 'SFN', 'COL1A1'))
+```
+
+```{r}
+LEC <- LEC %>% subset(subset = Flt4 > 0  | Mmrn1 > 0  |  Ccl21a > 0 | Lyve1 > 0 |  Prox1 > 0 | Gng11 < 0 | Kdr > 0)
+  # Flt4 > 0 | Mmrn1 > 0 | Ccl21a > 0 | Lyve1 > 0 | Prox1 > 0 | Gng11 < 0 | Kdr > 0
+  
+LEC <- LEC %>% 
+  subset(subset = Tyrobp == 0) %>%
+  subset(subset = S100a9 < 0.1) %>%
+  subset(subset = Mmp9 < 0.1) %>%
+  subset(subset = Acta2 < 0.1) %>%
+  subset(subset = Col1a2 == 0) %>%
+  subset(subset = Pdgfra == 0) %>%
+  subset(subset = Pdgfrb == 0) %>%
+  subset(subset = Krt15 < 0.1) %>%
+  subset(subset = Perp < 0.1) %>%
+  subset(subset = Sfn < 0.1) %>%
+  # subset(subset = `Hba-a1` == 0) %>%
+  # subset(subset = `Hba-a2` == 0) %>%
+  # subset(subset = `Hbb-bs` == 0) %>%
+  subset(subset = Col1a1 == 0) %>%
+  # subset(subset = Nkg7 == 0) %>%
+  subset(subset = Cd3e == 0) %>%
+  subset(subset = Ms4a1 == 0) %>%
+  subset(subset = Itgax == 0) %>%
+  subset(subset = Ptprc == 0)
+
+# LEC <- LEC %>% subset(subset = FLT4 > 0  | CCL21 > 0 | LYVE1 > 0 | PROX1 > 0 | KDR > 0)
+#   # FLT4 > 0 | MMRN1 > 0 | CCL21 > 0 | LYVE1 > 0 | PROX1 > 0 | GNG11 > 0 | KDR > 0
+#   
+# LEC <- LEC %>% subset(subset = TYROBP == 0) %>%
+#   subset(subset = S100A9 < 0.1) %>%
+#   subset(subset = MMP9 < 0.1) %>%
+#   subset(subset = ACTA2 < 0.1) %>%
+#   subset(subset = COL1A2 == 0) %>%
+#   subset(subset = PDGFRA == 0) %>%
+#   subset(subset = PDGFRB == 0) %>%
+#   subset(subset = KRT15 < 0.1) %>%
+#   subset(subset = PERP < 0.1) %>%
+#   subset(subset = SFN < 0.1) %>%
+#   subset(subset = HBA1 == 0) %>%
+#   subset(subset = HBA2 == 0) %>%
+#   subset(subset = HBB == 0) %>%
+#   subset(subset = COL1A1 == 0) %>%
+#   subset(subset = NKG7 == 0) %>%
+#   subset(subset = CD3E == 0) %>%
+#   subset(subset = MS4A1 == 0) %>%
+#   subset(subset = ITGAX == 0) %>%
+#   subset(subset = PTPRC == 0)
+dim(LEC)
+```
+
+```{r}
+FeaturePlot(LEC, feature = c('Pecam1', 'Cdh5', 'Tie1', 'Prox1', 'Flt4', 'Mmrn1', 'Ccl21a', 'Lyve1', 'Gng11', 'Kdr'))
+# FeaturePlot(LEC, feature = c('PECAM1', 'CDH5', 'TIE1', 'PROX1', 'FLT4', 'MMRN1', 'CCL21', 'LYVE1', 'GNG11', 'KDR'))
+
+FeaturePlot(LEC, features = c('Pdpn', 'Thy1', 'Nts', 'Reln', 'Maf', 'Nrp2', 'Tppp3', 'Prss23', 'Cyp4b1', 'Fxyd6', 'Fgl2', 'Cp'))
+# FeaturePlot(LEC, features = c('PDPN', 'THY1', 'NTS', 'RELN', 'MAF', 'NRP2', 'TPPP3', 'PRSS23', 'CYP4B1', 'FXYD6', 'FGL2', 'CP'))
+
+FeaturePlot(LEC, feature = c('Tyrobp', 'S100a9', 'Mmp9', 'Ptprc', 'Pdgfra', 'Pdgfrb', 'Acta2', 'Col1a2', 'Krt15', 'Perp'))
+FeaturePlot(LEC, feature = c('Nkg7', 'Cd3e', 'Ms4a1', 'Itgax', 'Ptprc', 'Hba-a1', 'Hba-a2', 'Hbb-bs', 'Sfn', 'Col1a1'))
+# FeaturePlot(LEC, feature = c('TYROBP', 'S100A9', 'MMP9', 'PTPRC', 'PDGFRA', 'PDGFRB', 'ACTA2', 'COL1A2', 'KRT15', 'PERP'))
+# FeaturePlot(LEC, feature = c('NKG7', 'CD3E', 'MS4A1', 'ITGAX', 'HBA1', 'HBA2', 'HBB', 'SFN', 'COL1A1'))
+```
+
+```{r}
+saveRDS(LEC, sprintf('/mnt/tank/scratch/dlupova/05.2022/LEC_mm/old/%s', object))
+n <- n + 1
+```

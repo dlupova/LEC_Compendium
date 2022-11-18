@@ -1,0 +1,58 @@
+```{r}
+suppressPackageStartupMessages({library(Seurat)
+  library(dplyr)
+  library(harmony)
+  library(ggplot2)
+  library(MAST)
+  library(biomaRt)})
+```
+
+```{r}
+object <- 'SRS4203426'
+#cluster <- 7
+```
+
+```{r}
+obj <- readRDS(file = sprintf('/mnt/tank/scratch/dlupova/05.2022/doublets_hs/%s.rds', object))         
+dim(obj)
+obj <- subset(obj, subset = nFeature_RNA > 300 & percent.mito < 0.2)
+dim(obj)
+```
+
+```{r message=FALSE, warning=FALSE}
+#LEC <- obj %>% subset(idents = cluster)
+LEC <- obj %>%  subset(subset = PROX1 > 0 | FLT4 > 0 | MMRN1 > 0 | CCL21 > 0 | LYVE1 > 0 | GNG11 > 0) %>%
+  subset(subset = TYROBP < 2) %>%
+  subset(subset = S100A9 < 1 & MMP9 < 1 & PTPRC < 1) %>%
+  subset(subset = PDGFRA < 1.5 & PDGFRB < 1.5 & COL1A2 < 1.5 & ACTA2 < 1.5) %>%
+  subset(subset = KRT15 < 1.5 & SFN < 1.5 & PERP < 1.5)
+dim(LEC)
+```
+
+```{r}
+FeaturePlot(LEC, feature = c('PECAM1', 'CDH5', 'TIE1', 'PROX1', 'FLT4', 'MMRN1', 'CCL21', 'LYVE1', 'GNG11'))
+```
+
+```{r}
+FeaturePlot(LEC, features = c('PDPN', 'THY1', 'NTS', 'RELN', 'MAF', 'NRP2', 'TPPP3', 'PRSS23', 'CYP4B1', 'FXYD6', 'FGL2', 'CP'))
+```
+
+```{r}
+lecs <- colnames(LEC)
+nonlecs <- setdiff(colnames(obj), lecs)
+
+nonLEC <- subset(obj, cells = nonlecs)
+LEC <- subset(obj, cells = lecs)
+
+merged <- merge(nonLEC, y = LEC)
+merged@meta.data$type <- c(rep("nonLEC", ncol(nonLEC)), rep('LEC', ncol(LEC)))
+
+Idents(object = merged, cells = 1:ncol(nonLEC)) <- 'nonLEC'
+Idents (object = merged, cells = ncol(nonLEC)+1:ncol(LEC)) <- 'LEC'
+table(merged@active.ident)
+
+markers <- FindMarkers(merged, ident.1 = "LEC", ident.2 = NULL, logfc.threshold = 0, min.pct = 0, assay = 'SCT')
+write.csv(markers, file = sprintf('/mnt/tank/scratch/dlupova/markers_hs/%s.csv', object))
+rm(list=ls())
+```
+
